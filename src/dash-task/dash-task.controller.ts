@@ -131,6 +131,26 @@ export class DashTaskController {
         }
     }
 
+    @Get("/submitted-tasks")
+    async getAllDashTaskSubmission(@Query("pageIndex", ParseIntPipe) pageIndex: number, @Query("pageSize", ParseIntPipe) pageSize: number): Promise<AppResponse<DashTaskSubmissions>> {
+
+        try {
+            // TOTAL TASKS
+            const totalTasks = await this.dashTaskService.getDashTasksSubmissionCount();
+
+            // ACTUAL TASKS 
+            const data = await this.dashTaskService.getDashTasksSubmission({ skip: (pageIndex - 1) * pageSize, take: pageSize, where: { isActive: true, status: 'SUBMITTED' }, orderBy: { createdAt: 'desc' } });
+            // TOTAL PAGES OF RESPONS
+            const pageCount = Math.ceil(totalTasks / pageSize)
+
+            return response(data.length ? "All dashboard tasks submissions" : "No dashboard tasks submissions found", { pageCount, data })
+        } catch (error) {
+            throw new BadRequestException(response(error.message, null, false))
+        }
+
+    }
+
+
 
 
 }

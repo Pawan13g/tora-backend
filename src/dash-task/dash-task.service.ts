@@ -187,10 +187,14 @@ export class DashTaskService {
         return this.prisma.dashboardTask.update({ where: { id }, data: task });
     }
 
+    async getDashTasksSubmissionCount(where?: Prisma.DashTaskSubmissionsWhereInput): Promise<Partial<Prisma.PrismaPromise<number>>> {
+        return this.prisma.dashTaskSubmissions.count({ where });
+    }
     /**
      * @description Service for submitting a dashboard task request in the database
      * @param {SubmitDashTask}  as Body of the request
      */
+
 
     async submitDashTask({ userId, taskId, picture }: SubmitDashTask): Promise<DashTaskSubmissions> {
 
@@ -219,6 +223,27 @@ export class DashTaskService {
         return await this.prisma.dashTaskSubmissions.update({ where: { id }, data: { status: status as any } })
 
     }
+
+    async getDashTasksSubmission(params: {
+        skip?: number;
+        take?: number;
+        cursor?: Prisma.DashTaskSubmissionsWhereUniqueInput;
+        where?: Prisma.DashTaskSubmissionsWhereInput;
+        orderBy?: Prisma.DashTaskSubmissionsOrderByWithRelationInput;
+    }): Promise<Partial<DashTaskSubmissions[]>> {
+        const { skip, take, cursor, where, orderBy } = params;
+        return this.prisma.dashTaskSubmissions.findMany({
+            skip,
+            take,
+            cursor,
+            where,
+            orderBy,
+
+        });
+    }
+
+
+
 
 
 }
