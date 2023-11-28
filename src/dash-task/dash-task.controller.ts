@@ -11,13 +11,14 @@ import {
     Delete,
     ValidationPipe,
     ParseIntPipe,
-    BadRequestException
+    BadRequestException,
+    HttpStatus
 
 } from '@nestjs/common';
 import { AppResponse } from 'shared/contants/types';
-import { DashboardTask, Prisma } from '@prisma/client';
+import { DashTaskSubmissions, DashboardTask, Prisma } from '@prisma/client';
 import { response } from 'shared/utils/gen-response';
-import { CreateDashTask } from './dash-task.dto'
+import { CreateDashTask, SubmitDashTask, UpdateTaskStatus } from './dash-task.dto'
 @Controller('dash-task')
 export class DashTaskController {
     constructor(private readonly dashTaskService: DashTaskService) { }
@@ -107,4 +108,29 @@ export class DashTaskController {
         }
 
     }
+
+    @Post("submit-task")
+    async submitDashTask(@Body(ValidationPipe) data: SubmitDashTask): Promise<AppResponse<DashTaskSubmissions>> {
+
+        try {
+            const task = await this.dashTaskService.submitDashTask(data);
+            return response("task request submitted, will be approved soon...", task)
+        } catch (error) {
+            throw new BadRequestException(response(error.message, null, false))
+        }
+
+    }
+    @Patch(":id/update-status")
+    async updateDashTaskStatus(@Param('id', ParseIntPipe) id: number, @Body(ValidationPipe) body: UpdateTaskStatus): Promise<AppResponse<DashboardTask>> {
+
+        try {
+            const task = await this.dashTaskService.updateTaskStatus({ id, body });
+            return response(" task status updated successfully", task)
+        } catch (error) {
+            throw new BadRequestException(response(error.message, null, false))
+        }
+    }
+
+
+
 }
