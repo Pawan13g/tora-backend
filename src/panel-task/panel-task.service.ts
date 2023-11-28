@@ -12,16 +12,38 @@ export class PanelTaskService {
     * @description Service for getting totel number of counts in database
     */
 
-    async getPanelTaskCount(): Promise<Partial<Prisma.PrismaPromise<number>>> {
-        return this.prisma.panelTask.count();
+    async getPanelTaskCount(where?: Prisma.PanelTaskWhereInput): Promise<Partial<Prisma.PrismaPromise<number>>> {
+        return this.prisma.panelTask.count({ where });
     }
 
     /**
-    * @description Service for getting single task form data base
-    * @param {any} PanelTaskWhereUniqueInput
+    * @description Service for finding tasks form data base
+    * @param {any} searchQuery
     */
 
-    async getTask(
+    async findTasks(
+        searchQuery: any,
+    ): Promise<PanelTask[] | []> {
+        const task = this.prisma.panelTask.findMany({
+            where: searchQuery,
+            select: {
+                id: true,
+                name: true,
+                amount: true,
+                kpi: true,
+                t_link: true,
+                isActive: true,
+                createdAt: true,
+                updatedAt: true,
+            }
+        });
+
+        if (!task) throw Error('task not found');
+
+        return task;
+    }
+
+    async findTask(
         panelTaskWhereUniqueInput: Prisma.PanelTaskWhereUniqueInput,
     ): Promise<Partial<PanelTask> | null> {
         const task = this.prisma.panelTask.findUnique({
@@ -56,6 +78,7 @@ export class PanelTaskService {
         orderBy?: Prisma.PanelTaskOrderByWithRelationInput;
     }): Promise<Partial<any[]>> {
         const { skip, take, cursor, where, orderBy } = params;
+
         return this.prisma.panelTask.findMany({
             skip,
             take,

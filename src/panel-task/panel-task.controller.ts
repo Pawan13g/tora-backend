@@ -16,9 +16,10 @@ import {
 
 } from '@nestjs/common';
 import { AppResponse } from 'shared/contants/types';
-import { PanelTask } from '@prisma/client';
+import { PanelTask, Prisma } from '@prisma/client';
 import { response } from 'shared/utils/gen-response';
 import { CreatePanelTask, UpdatePanelTask } from './panel-task.dto';
+import { skip } from 'node:test';
 
 @Controller('panel-task')
 export class PanelTaskController {
@@ -37,17 +38,38 @@ export class PanelTaskController {
 
     }
 
+    @Get("")
+    async findTasks(@Query("name") name: string): Promise<AppResponse<PanelTask>> {
+
+        try {
+            // FILTERS
+            const where: Prisma.PanelTaskWhereInput = { isActive: true, name: { contains: name } }
+
+            // ACTUAL TASKS 
+            const data = await this.panelTaskService.getTasks({ where });
+
+            return response(data.length ? "matches found" : "No match found", { pageCount: null, data })
+
+        } catch (error) {
+            throw new BadRequestException(response(error.message, null, false))
+        }
+
+    }
+
     @Get("/all")
 
     async getAllPanelTask(@Query("pageIndex", ParseIntPipe) pageIndex: number, @Query("pageSize", ParseIntPipe) pageSize: number): Promise<AppResponse<PanelTask>> {
 
         try {
+            // TOTAL TASKS
             const totalTasks = await this.panelTaskService.getPanelTaskCount();
-            const tasks = await this.panelTaskService.getTasks({ skip: (pageIndex - 1) * pageSize, take: pageSize, where: { isActive: true } });
 
-            const tasksPageCount = Math.round(totalTasks / pageSize)
+            // ACTUAL TASKS 
+            const data = await this.panelTaskService.getTasks({ skip: (pageIndex - 1) * pageSize, take: pageSize, where: { isActive: true }, orderBy: { createdAt: 'desc' } });
+            // TOTAL PAGES OF RESPONS
+            const pageCount = Math.round(totalTasks / pageSize)
 
-            return response(tasks.length ? "All tasks" : "No tasks found", { tasksPageCount, tasks })
+            return response(data.length ? "All tasks" : "No tasks found", { pageCount, data })
         } catch (error) {
             throw new BadRequestException(response(error.message, null, false))
         }
@@ -59,7 +81,7 @@ export class PanelTaskController {
     async getSinglePanelTask(@Param('id', ParseIntPipe) id: number): Promise<AppResponse<PanelTask>> {
 
         try {
-            const task = await this.panelTaskService.getTask({ id, isActive: true });
+            const task = await this.panelTaskService.findTask({ id, isActive: true });
 
             return response(task ? "task found" : "No task found", task)
         } catch (error) {
