@@ -16,7 +16,7 @@ import {
 
 } from '@nestjs/common';
 import { AppResponse } from 'shared/contants/types';
-import { DashTaskSubmissions, DashboardTask, Prisma } from '@prisma/client';
+import { DashboardTask, DashboardTaskSubmission, Prisma } from '@prisma/client';
 import { response } from 'shared/utils/gen-response';
 import { CreateDashTask, SubmitDashTask, UpdateTaskStatus } from './dash-task.dto'
 @Controller('dash-task')
@@ -71,7 +71,45 @@ export class DashTaskController {
         }
 
     }
+    @Get("submissions")
+    async getDashTaskSubmission(@Query("pageIndex", ParseIntPipe) pageIndex: number, @Query("pageSize", ParseIntPipe) pageSize: number, @Query("status") status: string): Promise<AppResponse<DashboardTaskSubmission[]>> {
 
+        const convertedStatus: any = status.toUpperCase();
+
+
+        if (convertedStatus !== 'SUBMITTED' && convertedStatus !== "APPROVED" && convertedStatus !== 'REJECTED')
+            throw new BadRequestException(response('invalid submissions status ', null, false))
+
+        try {
+            // TOTAL SUBMISSIONS
+            const totalTasks = await this.dashTaskService.getDashTaskSubmissionCount();
+
+            // ACTUAL SUBMISSIONS 
+            const data = await this.dashTaskService.getDashTaskSubmissions({ skip: (pageIndex - 1) * pageSize, take: pageSize, where: { isActive: true, status: convertedStatus }, orderBy: { createdAt: 'desc' } });
+
+            // TOTAL PAGES OF RESPONSE
+            const pageCount = Math.ceil(totalTasks / pageSize)
+
+            if (!data.length)
+                return response(`no task submissions found for status: ${convertedStatus}`, { pageCount, data })
+
+            return response(`task submissions found for status: ${convertedStatus}`, { pageCount, data })
+
+        } catch (error) {
+            throw new BadRequestException(response(error.message, null, false))
+        }
+    }
+
+    @Post("submission/submit-task")
+    async submitDashTask(@Body(ValidationPipe) data: SubmitDashTask): Promise<AppResponse<DashboardTaskSubmission>> {
+
+        try {
+            const submission = await this.dashTaskService.submitDashTask(data);
+            return response("task submittd, will be approved soon...", submission)
+        } catch (error) {
+            throw new BadRequestException(response(error.message, null, false))
+        }
+    }
 
     @Get("/:id")
     async getSingleDashTask(@Param('id', ParseIntPipe) id: number): Promise<AppResponse<DashboardTask>> {
@@ -108,47 +146,23 @@ export class DashTaskController {
         }
 
     }
-
-    @Post("submit-task")
-    async submitDashTask(@Body(ValidationPipe) data: SubmitDashTask): Promise<AppResponse<DashTaskSubmissions>> {
+    @Patch("submission/:id")
+    async updateDashTaskSubmission(@Param('id', ParseIntPipe) id: number, @Body(ValidationPipe) body: UpdateTaskStatus): Promise<AppResponse<DashboardTaskSubmission>> {
 
         try {
-            const task = await this.dashTaskService.submitDashTask(data);
-            return response("task request submitted, will be approved soon...", task)
+            const submission = await this.dashTaskService.updateTaskStatus({ id, body });
+            return response("task submission status has been updated", submission)
         } catch (error) {
             throw new BadRequestException(response(error.message, null, false))
         }
 
     }
-    @Patch(":id/update-status")
-    async updateDashTaskStatus(@Param('id', ParseIntPipe) id: number, @Body(ValidationPipe) body: UpdateTaskStatus): Promise<AppResponse<DashboardTask>> {
 
-        try {
-            const task = await this.dashTaskService.updateTaskStatus({ id, body });
-            return response(" task status updated successfully", task)
-        } catch (error) {
-            throw new BadRequestException(response(error.message, null, false))
-        }
-    }
 
-    @Get("/submitted-tasks")
-    async getAllDashTaskSubmission(@Query("pageIndex", ParseIntPipe) pageIndex: number, @Query("pageSize", ParseIntPipe) pageSize: number): Promise<AppResponse<DashTaskSubmissions>> {
 
-        try {
-            // TOTAL TASKS
-            const totalTasks = await this.dashTaskService.getDashTasksSubmissionCount();
 
-            // ACTUAL TASKS 
-            const data = await this.dashTaskService.getDashTasksSubmission({ skip: (pageIndex - 1) * pageSize, take: pageSize, where: { isActive: true, status: 'SUBMITTED' }, orderBy: { createdAt: 'desc' } });
-            // TOTAL PAGES OF RESPONS
-            const pageCount = Math.ceil(totalTasks / pageSize)
 
-            return response(data.length ? "All dashboard tasks submissions" : "No dashboard tasks submissions found", { pageCount, data })
-        } catch (error) {
-            throw new BadRequestException(response(error.message, null, false))
-        }
 
-    }
 
 
 

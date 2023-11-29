@@ -1,10 +1,11 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { DashTaskSubmissions, DashboardTask, Prisma } from '@prisma/client';
+import { DashboardTask, DashboardTaskSubmission, Prisma } from '@prisma/client';
 import * as fs from 'fs';
 import { PrismaService } from 'shared/services/prisma.service';
 import { CreateDashTask, SubmitDashTask, UpdateTaskStatus } from './dash-task.dto';
 import * as path from 'path';
-import { getUniqueFileName, purifyString } from 'shared/utils/utils';
+import { getUniqueFileName } from 'shared/utils/utils';
+import { response } from 'shared/utils/gen-response';
 
 @Injectable()
 export class DashTaskService {
@@ -187,16 +188,46 @@ export class DashTaskService {
         return this.prisma.dashboardTask.update({ where: { id }, data: task });
     }
 
-    async getDashTasksSubmissionCount(where?: Prisma.DashTaskSubmissionsWhereInput): Promise<Partial<Prisma.PrismaPromise<number>>> {
-        return this.prisma.dashTaskSubmissions.count({ where });
+
+
+    /**
+     * @description Service for getting totel count of submissions of dashboard tasks in database
+     */
+
+    async getDashTaskSubmissionCount(where?: Prisma.DashboardTaskSubmissionWhereInput): Promise<Partial<Prisma.PrismaPromise<number>>> {
+        return this.prisma.dashboardTaskSubmission.count({ where });
     }
+
+
+
+    /**
+    * @description Service for getting multiple dashboard task submissions form data base
+    */
+
+    async getDashTaskSubmissions(params: {
+        skip?: number;
+        take?: number;
+        cursor?: Prisma.DashboardTaskSubmissionWhereUniqueInput;
+        where?: Prisma.DashboardTaskSubmissionWhereInput;
+        orderBy?: Prisma.DashboardTaskSubmissionOrderByWithRelationInput;
+    }): Promise<Partial<any[]>> {
+        const { skip, take, cursor, where, orderBy } = params;
+
+        return this.prisma.dashboardTaskSubmission.findMany({
+            skip,
+            take,
+            cursor,
+            where,
+            orderBy,
+        });
+    }
+
     /**
      * @description Service for submitting a dashboard task request in the database
      * @param {SubmitDashTask}  as Body of the request
      */
 
-
-    async submitDashTask({ userId, taskId, picture }: SubmitDashTask): Promise<DashTaskSubmissions> {
+    async submitDashTask({ userId, taskId, picture }: SubmitDashTask): Promise<DashboardTaskSubmission> {
 
         const pictureBuffer = Buffer.from(picture.base64.split(",")[1], 'base64');
         const pictureName = getUniqueFileName(picture.name)
@@ -204,43 +235,48 @@ export class DashTaskService {
         const picturePath = path.join(process.cwd(), 'uploads', relativePath);
         fs.writeFileSync(picturePath, pictureBuffer);
 
-        return await this.prisma.dashTaskSubmissions.create({ data: { taskId, userId, picture: relativePath } });
+
+        try {
+
+            return await this.prisma.dashboardTaskSubmission.create({ data: { taskId, userId, picture: relativePath } });
+
+        } catch (error) {
+
+            if (error instanceof Prisma.PrismaClientKnownRequestError) {
+
+                if (error.code === 'P2002') {
+                    throw new BadRequestException("There is a unique constraint violation, on userId, one user can submit a task only once");
+                }
+                else if (error.code === 'P2003') {
+                    throw new BadRequestException("Foreign key constraint failed on the field taskId or userId make sure both of the records exists");
+                }
+            }
+
+            throw new BadRequestException(response("Error while submitting the task", null, false))
+
+        }
+
     }
 
 
     /**
-    * @description Service for updateing a dashboard task status
+    * @description Service for updateing a submission status of dashboard task 
     * @param {TaskId} as param of request
     * @param {status} as body of request 
     */
 
-    async updateTaskStatus({ id, body: { status } }: { id: number, body: UpdateTaskStatus }): Promise<DashTaskSubmissions> {
+    async updateTaskStatus({ id, body: { status } }: { id: number, body: UpdateTaskStatus }): Promise<DashboardTaskSubmission> {
 
-        const task = await this.prisma.dashTaskSubmissions.findUnique({ where: { id } })
+        const task = await this.prisma.dashboardTaskSubmission.findUnique({ where: { id } })
 
-        if (!task) new NotFoundException(`dashboard task for ${id} is now found`)
+        if (!task) new NotFoundException(`task submission for ${id} is now found`)
 
-        return await this.prisma.dashTaskSubmissions.update({ where: { id }, data: { status: status as any } })
+        return await this.prisma.dashboardTaskSubmission.update({ where: { id }, data: { status: status as any } })
 
     }
 
-    async getDashTasksSubmission(params: {
-        skip?: number;
-        take?: number;
-        cursor?: Prisma.DashTaskSubmissionsWhereUniqueInput;
-        where?: Prisma.DashTaskSubmissionsWhereInput;
-        orderBy?: Prisma.DashTaskSubmissionsOrderByWithRelationInput;
-    }): Promise<Partial<DashTaskSubmissions[]>> {
-        const { skip, take, cursor, where, orderBy } = params;
-        return this.prisma.dashTaskSubmissions.findMany({
-            skip,
-            take,
-            cursor,
-            where,
-            orderBy,
 
-        });
-    }
+
 
 
 
